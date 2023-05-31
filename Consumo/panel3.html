@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <!-- Agregar enlaces a los estilos de Bootstrap -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <!-- Agregar enlaces a los estilos de noUiSlider -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.6.3/nouislider.min.css">
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="form-group">
+            <label for="productNameInput">Nombre del Producto:</label>
+            <input type="text" id="productNameInput" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="startDateInput">Fecha de Inicio:</label>
+            <input type="date" id="startDateInput" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="endDateInput">Fecha Final:</label>
+            <input type="date" id="endDateInput" class="form-control">
+        </div>
+        <button onclick="loadChartData()" class="btn btn-primary">Cargar Datos</button>
+    </div>
+
+    <div class="container">
+        <div class="form-group">
+            <label for="slider">Filtrar Rango:</label>
+            <div id="slider"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <canvas id="chart"></canvas>
+    </div>
+
+    <div class="container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Mes</th>
+                    <th>Ventas Totales</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+
+            </tbody>
+        </table>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.6.3/nouislider.min.js"></script>
+    <script type="text/javascript">
+        var originalData = [];
+        var chart;
+
+        function loadChartData() {
+            var productNameInput = document.getElementById('productNameInput');
+            var startDateInput = document.getElementById('startDateInput');
+            var endDateInput = document.getElementById('endDateInput');
+
+            var productName = productNameInput.value;
+            var startDate = startDateInput.value;
+            var endDate = endDateInput.value;
+
+            fetch("http://localhost:83/Product/GetProductSales/" + encodeURIComponent(productName) + "/" + encodeURIComponent(startDate) + "/" + encodeURIComponent(endDate),
+                {
+                    headers: { "Content-Type": "application/json" },
+                    credentials: 'include'
+                }
+            )
+                .then(response => {
+                    if (!response.ok) {
+                        throw response;
+                    }
+                    return response.json();
+                })
+                .then(info => {
+                    originalData = info;
+                    updateChart();
+                    updateTable();
+                })
+                .catch(error => console.log(error));
+        }
+
+        function updateChart() {
+            var slider = document.getElementById('slider');
+            var filterValue = slider.noUiSlider.get();
+
+            var filteredData = originalData.filter(item => item.totalSales <= filterValue);
+
+            var months = filteredData.map(item => {
+                var month = new Date(item.year, item.month - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+                return month;
+            });
+
+            var sales = filteredData.map(item => item.totalSales);
+
+            var ctx = document.getElementById('chart').getContext('2d');
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: 'Ventas Totales',
+                        data: sales,
+                        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTable() {
+            var tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+
+            var slider = document.getElementById('slider');
+            var filterValue = slider.noUiSlider.get();
+
+            var filteredData = originalData.filter(item => item.totalSales <= filterValue);
+
+            filteredData.forEach(item => {
+                var month = new Date(item.year, item.month - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+                var row = document.createElement('tr');
+                var monthCell = document.createElement('td');
+                var salesCell = document.createElement('td');
+
+                monthCell.textContent = month;
+                salesCell.textContent = item.totalSales;
+
+                row.appendChild(monthCell);
+                row.appendChild(salesCell);
+                tableBody.appendChild(row);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var slider = document.getElementById('slider');
+
+            noUiSlider.create(slider, {
+                start: [100],
+                connect: [true, false],
+                range: {
+                    'min': 0,
+                    'max': 100
+                },
+                tooltips: true,
+                format: {
+                    to: function (value) {
+                        return value.toFixed(2);
+                    },
+                    from: function (value) {
+                        return parseFloat(value);
+                    }
+                }
+            });
+
+            slider.noUiSlider.on('update', function (values, handle) {
+                updateChart();
+                updateTable();
+            });
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <!-- Agregar enlaces a los estilos de Bootstrap -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="form-group">
+            <label for="yearInput">Año:</label>
+            <input type="number" id="yearInput" min="1900" max="2100" value="1997" class="form-control">
+        </div>
+        <button onclick="loadChartData()" class="btn btn-primary">Cargar Datos</button>
+    </div>
+    <div id="dashboard_div">
+        <div id="programmatic_control_div_1"></div>
+        <div id="programmatic_control_div_2"></div>
+        <div id="programmatic_control_div_3"></div>
+        <div id="programmatic_control_div_4"></div>
+        <div id="programmatic_chart_div" style="height: 800px"></div>
+        <div id="table_div"></div>
+    </div>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+        google.charts.load('current', { 'packages': ['corechart', 'controls', 'table'] });
+
+        function loadChartData() {
+            var yearInput = document.getElementById('yearInput');
+            var year = parseInt(yearInput.value);
+
+            google.charts.setOnLoadCallback(() => {
+                fetch("http://localhost:83/Product/GetCincoProductos/" + year, {
+                    headers: { "Content-Type": "application/json" },
+                    credentials: 'include'
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw response;
+                        }
+                        return response.json();
+                    })
+                    .then(info => {
+                        drawDashboard(info);
+                    })
+                    .catch(error => console.log(error));
+            });
+        }
+
+        function drawDashboard(info) {
+            var data = new google.visualization.DataTable();
+            data.addColumn('string', 'Producto');
+            data.addColumn('number', 'Trimestre 1');
+            data.addColumn('number', 'Trimestre 2');
+            data.addColumn('number', 'Trimestre 3');
+            data.addColumn('number', 'Trimestre 4');
+
+            var productos = [...new Set(info.map(item => item.nombre))];
+
+            productos.forEach(producto => {
+                var unidadesVendidasPorTrimestre = [0, 0, 0, 0];
+
+                info.filter(item => item.nombre === producto).forEach(item => {
+                    unidadesVendidasPorTrimestre[item.trimestre - 1] = item.unidadesVendidas;
+                });
+
+                data.addRow([producto].concat(unidadesVendidasPorTrimestre));
+            });
+
+            var dashboard = new google.visualization.Dashboard(document.getElementById('dashboard_div'));
+
+            var programmaticSlider1 = new google.visualization.ControlWrapper({
+                'controlType': 'NumberRangeFilter',
+                'containerId': 'programmatic_control_div_1',
+                'options': {
+                    'filterColumnLabel': 'Trimestre 1',
+                    'ui': { 'labelStacking': 'vertical' }
+                }
+            });
+
+            var programmaticSlider2 = new google.visualization.ControlWrapper({
+                'controlType': 'NumberRangeFilter',
+                'containerId': 'programmatic_control_div_2',
+                'options': {
+                    'filterColumnLabel': 'Trimestre 2',
+                    'ui': { 'labelStacking': 'vertical' }
+                }
+            });
+
+            var programmaticSlider3 = new google.visualization.ControlWrapper({
+                'controlType': 'NumberRangeFilter',
+                'containerId': 'programmatic_control_div_3',
+                'options': {
+                    'filterColumnLabel': 'Trimestre 3',
+                    'ui': { 'labelStacking': 'vertical' }
+                }
+            });
+
+            var programmaticSlider4 = new google.visualization.ControlWrapper({
+                'controlType': 'NumberRangeFilter',
+                'containerId': 'programmatic_control_div_4',
+                'options': {
+                    'filterColumnLabel': 'Trimestre 4',
+                    'ui': { 'labelStacking': 'vertical' }
+                }
+            });
+
+            var programmaticChart = new google.visualization.ChartWrapper({
+                'chartType': 'BarChart',
+                'containerId': 'programmatic_chart_div',
+                'options': {
+                    'width': '100%',
+                    'height': '100%',
+                    'chartArea': { 'width': '70%', 'height': '80%' },
+                    'hAxis': { 'title': 'Unidades Vendidas' },
+                    'vAxis': { 'title': 'Producto' }
+                }
+            });
+
+            var table = new google.visualization.ChartWrapper({
+                'chartType': 'Table',
+                'containerId': 'table_div',
+                'options': {
+                    'width': '100%',
+                    'height': '100%'
+                }
+            });
+
+            dashboard.bind([programmaticSlider1, programmaticSlider2, programmaticSlider3, programmaticSlider4], [programmaticChart, table]);
+            dashboard.draw(data);
+        }
+    </script>
+</body>
+
+</html>

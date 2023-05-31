@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" />
+    <link href="https://cdn.datatables.net/colreorder/1.6.2/css/colReorder.dataTables.min.css" rel="stylesheet" />
+    <link href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css" rel="stylesheet" />
+    <link href="https://cdn.datatables.net/rowgroup/1.3.1/css/rowGroup.dataTables.min.css" rel="stylesheet" />
+    <!-- Agregar enlaces a los estilos de Bootstrap -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        .container {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="form-group">
+            <label for="startDate">Fecha inicial:</label>
+            <input type="date" id="startDate" name="startDate" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="endDate">Fecha final:</label>
+            <input type="date" id="endDate" name="endDate" class="form-control">
+        </div>
+        <button onclick="generarTabla()" class="btn btn-primary">Generar tabla</button>
+        <button onclick="exportarExcel()" class="btn btn-success">Exportar a Excel</button>
+    </div>
+
+    <div class="container">
+        <table id="tblProductos" class="display" style="width:100%"></table>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/colreorder/1.6.2/js/dataTables.colReorder.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.colVis.min.js"></script>
+    <script src="https://cdn.datatables.net/rowgroup/1.3.1/js/dataTables.rowGroup.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
+    <script>
+        var tabla;
+
+        function generarTabla() {
+            var startDate = document.getElementById("startDate").value;
+            var endDate = document.getElementById("endDate").value;
+
+            var idTabla = '#tblProductos';
+
+            // Destruir la tabla existente
+            if ($.fn.DataTable.isDataTable(idTabla)) {
+                tabla.destroy();
+            }
+
+            fetch("http://localhost:83/Product/GetPeriodo/" + startDate + "/" + endDate)
+                .then(response => response.json())
+                .then(info => {
+                    tabla = $(idTabla).DataTable({
+                        data: info,
+                        columns: [
+                            {
+                                title: 'Año',
+                                data: 'year',
+                                render: $.fn.dataTable.render.number()
+                            },
+                            {
+                                title: 'Mes',
+                                data: 'month',
+                                render: $.fn.dataTable.render.text()
+                            },
+                            {
+                                title: 'Total vendido ($)',
+                                data: 'totalPrice',
+                                render: $.fn.dataTable.render.number()
+                            }
+                        ],
+                        dom: 'Bfrtip',
+                        colReorder: true,
+                        buttons: [
+                            'colvis',
+                            'excelHtml5'
+                        ],
+                        order: [[0, 'asc'], [1, 'asc']],
+                        rowGroup: {
+                            startRender: null,
+                            endRender: function (rows, group) {
+                                var sum = rows
+                                    .data()
+                                    .pluck('totalPrice')
+                                    .reduce(function (a, b) {
+                                        return a + b;
+                                    }, 0);
+                                var total = $.fn.dataTable.render.number(',', '.', 0, '$').display(sum);
+                                return $('<tr/>')
+                                    .append('<td colspan="2"><strong>Total ($) Productos vendidos en el año ' + group + ':</strong></td>')
+                                    .append('<td><strong>' + total + '</strong></td>');
+                            },
+                            dataSrc: 'year'
+                        },
+                        lengthMenu: [[25, 50, 100, -1], [25, 50, 100, "All"]]
+                    });
+                })
+                .catch(error => console.log(error));
+        }
+
+        function exportarExcel() {
+            tabla.button('.buttons-excel').trigger();
+        }
+    </script>
+</body>
+
+</html>
